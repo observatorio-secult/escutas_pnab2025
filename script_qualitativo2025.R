@@ -22,11 +22,25 @@ theme_set(theme_bw())
 
 
 # bancos
-setwd(here("Dados"))
+setwd(here("dados"))
 
-banco_geral <- read_xlsx("banco_geral.xlsx", sheet = "CONSOLIDADE X TEMA")
-banco_mapa <- read_xlsx("banco_mapa.xlsx")
-banco_escutas <- read_xlsx("banco_geral.xlsx", sheet = "ESCUTAS")
+escutas <- read_xlsx("escuta_pnab2025.xlsx", sheet = "Qualitativo")
+mapa <- read_xlsx("escuta_pnab2025.xlsx", sheet = "Mapa")
+
+
+a <- escutas %>% group_by(tema, subtema) %>% summarise(n = n()) %>% 
+  arrange(tema, -n)
+
+setwd(here())
+
+write.xlsx(a, "quantidade de proposicoes por tema e subtema.xlsx")
+
+
+mapa %>% group_by(pnab_1) %>% summarise(n = n())
+
+
+write.xlsx(mapa %>% filter(pnab_1 == "Não") %>% select(id, pnab_1, pnab_1_n),
+           "razões não participação pnab1.xlsx")
 
 
 # GERAL---------

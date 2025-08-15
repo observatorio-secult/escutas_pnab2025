@@ -45,17 +45,13 @@ write.xlsx(mapa %>% filter(pnab_1 == "Não") %>% select(id, pnab_1, pnab_1_n),
 
 # GERAL---------
 
-a <- banco_geral %>% group_by(OITIVA, TEMA) %>% summarise(n = n())
-
-write.xlsx(a, "tabela1.xlsx")
-
 ## Temas
 
-temas<- banco_geral %>% count(TEMA)
+temas<- escutas %>% count(tema)
 
-theme_set(theme_bw())
-gtema <- ggplot(temas, aes (reorder (TEMA, n), n))+
-  geom_bar(stat = "identity", width = .6, color = "black", fill = "#716CA7") +
+
+gtema <- ggplot(temas, aes (reorder (tema, n), n))+
+  geom_bar(stat = "identity", width = .6, color = "black", fill = "#01cf01") +
   theme(panel.grid = element_blank(),
         axis.text = element_text(face = "bold", size = 12),
         axis.title = element_text(face = "bold")) +
@@ -64,20 +60,32 @@ gtema <- ggplot(temas, aes (reorder (TEMA, n), n))+
             hjust =-0.1) +
   expand_limits(y = c(0, 350))+
   labs(y = "Número de contribuições", x = "Tema")+
-  coord_flip()
+  coord_flip() +
+  expand_limits(y = c(0, 450))
 
 gtema
 
 ggsave ("gtema.png", height = 6, width = 8)
 
+## Notas dos editais
+
+names(mapa)
+
+opiniao <- mapa %>% select(id, op_formacao:op_diversidade) %>% 
+  gather(key = "edital", value = "nota", op_formacao:op_diversidade) %>% 
+  mutate(nota = as.numeric(gsub("\\..*", "", nota)))
+
+opiniao %>% group_by(edital) %>% summarise(nota = mean(nota)) %>% arrange(-nota)
+
 
 ## Subtema
 
-subtema <- banco_geral %>% count(TEMA, SUBTEMA) %>% 
-  mutate(SUBTEMA= ifelse(SUBTEMA== "REMANEJAMENTO DE RECURSOS E RENDIMENTOS", "REMANEJAMENTO\nE RENDIMENTOS",
-                         ifelse(SUBTEMA== "TRANSPARÊNCIA E FISCALIZAÇÃO", "TRANSPARÊNCIA\nE FISCALIZAÇÃO",
-                                ifelse(SUBTEMA== "INSCRIÇÕES E IMPEDIMENTOS", "INSCRIÇÕES\nE IMPEDIMENTOS",
-                                       SUBTEMA))))
+subtema <- escutas %>% count(tema, subtema) %>% 
+  mutate(subtema = case_when(subtema == "Transparência e Fiscalização" ~ "Transparência e\nFiscalização",
+                             subtema == "Inscrições e Impedimentos" ~ "Inscrições e\nImpedimentos",
+                             subtema == "Remanejamento de Recursos e Rendimentos" ~ "Remanejamento de\nRecursos",
+                             tema == "Inválida" ~ "Inválida",
+                             TRUE ~ subtema)) %>% filter(tema != "Inválida")
 
 
 scale_x_reordered <- function(..., sep = "___") {
@@ -90,118 +98,68 @@ reorder_within <- function(x, by, within, fun = mean, sep = "___", ...) {
   stats::reorder(new_x, by, FUN = fun)
 }
 
-gsubtema <- ggplot(subtema %>% filter(TEMA!= "EDITAIS"), aes(x= reorder_within(SUBTEMA,n,TEMA), y = n))+
-  geom_bar(stat="identity", width=.6, aes(fill = TEMA))+
+gsubtema <- ggplot(subtema %>% filter(tema != "Editais"), aes(x= reorder_within(subtema,n,tema), y = n))+
+  geom_bar(stat="identity", width=.6, aes(fill = tema))+
   scale_x_reordered() +
   coord_flip() +
-  facet_wrap(.~TEMA, scales = "free", ncol = 2)+ theme(legend.position = "none")+
-  geom_text(aes(label=paste0(n, " (", scales::percent(n/sum(n), accuracy = 0.01), ")")), size = 4.5, hjust = -.1) +
-  expand_limits(y = c(0, 180))+theme(legend.position = "none") +
-  theme(panel.grid = element_blank(), axis.title = element_text(face = "bold"), 
-        axis.text = element_text(size= 12),
-        strip.text = element_text(size = 20))+
+  facet_wrap(.~tema, scales = "free_y", ncol = 2)+ theme(legend.position = "none")+
+  geom_text(aes(label=paste0(n, " (", scales::percent(n/sum(n), accuracy = 0.01), ")")), 
+            size = 4, hjust = -.1, data = subtema %>% filter(tema != "Editais") %>% filter(tema != "Inválida")) +
+  geom_text(aes(label=paste0(n, " (", scales::percent(n/sum(n), accuracy = 0.01), ")")), 
+            size = 4, hjust = 1.1, data = subtema %>% filter(tema != "Editais") %>% filter(tema == "Inválida")) +
+  theme(legend.position = "none") +
+  theme(panel.grid = element_blank(), 
+        axis.title = element_text(face = "bold"),
+        axis.text.y = element_text(face = "bold", size = 11))+
+  expand_limits(y = c(0, 180)) +
   labs(y = "Número de contribuições", x = "Subtemas")
 
 
 gsubtema
 
-ggsave ("gsubtema.png", height = 10, width = 12)
+ggsave ("gsubtema.png")
 
 # Editais
 
-gsubtema <- ggplot(subtema %>% filter(TEMA == "EDITAIS") %>% 
-                     mutate(SUBTEMA = ifelse(SUBTEMA == "LINGUAGEM TÉCNICOS", "Técnicos",
-                                             str_to_title(SUBTEMA))), 
-                   aes(x= reorder(SUBTEMA,n), y = n)) +
-  geom_segment(aes(xend=SUBTEMA, yend = 0), color="grey80", lty="dashed")+
-  geom_point(size=2,color="#623E3E") +
+gsubtema <- ggplot(subtema %>% filter(tema == "Editais"), 
+                   aes(x= reorder(subtema,n), y = n)) +
+  geom_segment(aes(xend=subtema, yend = 0), color="grey80", lty="dashed")+
+  geom_point(size=2,color="#183fff") +
   coord_flip()+
   theme(panel.grid = element_blank(),
         axis.title = element_text(face = "bold")) +
   geom_text(aes(label = paste0(n, " (",
                                scales::percent(n/sum(n)), ")")),
             hjust = - 0.1, size=3) +
-  expand_limits(y = c(0, 40)) +
+  expand_limits(y = c(0, 200)) +
   labs(y = "Número de Contribuições", x = "Subtemas")
 
 gsubtema
 
-ggsave ("editais.png", height = 6, width = 8)
+ggsave ("editais.png")
 
 # CONTRIBUICOES POR LINGUAGENS
 
-linguagem <- rbind(
-  banco_escutas %>% select(CODE, LINGUAGEM),
-  banco_mapa %>% select(CODE, LINGUAGEM)
-) %>% unique()
+linguagem <- escutas %>% left_join(mapa %>% select(id, linguagem)) %>% 
+  count(linguagem)
 
-banco_geral <- banco_geral %>% 
-  left_join(linguagem, by = "CODE")
-
-
-unique(banco_geral$LINGUAGEM)
-
-banco_geral <- banco_geral %>% 
-  mutate(LINGUAGEM = str_to_upper(LINGUAGEM))
-
-banco_geral <- banco_geral %>% 
-  mutate(LINGUAGEM = ifelse(LINGUAGEM == "GESTORES MUNICIPAIS DE CULTURA", "GESTÃO",
-                            ifelse(LINGUAGEM == "ARTES DA DANÇA", "DANÇA",
-                                   ifelse(LINGUAGEM == "TÉCNICO", "TÉCNICOS",
-                                          ifelse(LINGUAGEM == "ARTES DO TEATRO", "TEATRO",
-                                                 ifelse(LINGUAGEM == "MODA", "DESIGN E MODA",
-                                                        ifelse(LINGUAGEM == "DESIGN", "DESIGN E MODA",
-                                                               ifelse(LINGUAGEM == "MUSEUS", "PATRIMÔNIO",
-                                                                      ifelse(LINGUAGEM == "OUTRO SEGMENTO CULTURAL", "OUTRA",
-                                                                             LINGUAGEM)))))))))
-
-
-linguagem <- banco_geral %>% count(LINGUAGEM) %>% 
-  mutate(LINGUAGEM = str_to_title(LINGUAGEM))
-names(banco_geral)
-
-#
-linguagem_plot <- ggplot(linguagem, aes(x= reorder(LINGUAGEM,n), y = n)) +
-  geom_segment(aes(xend=LINGUAGEM, yend = 0), color="grey80", lty="dashed")+
-  geom_point(size=2,color="#623E3E") +
-  coord_flip()+
-  theme(panel.grid = element_blank(),
-        axis.title = element_text(face = "bold")) +
-  geom_text(aes(label = paste0(n, " (",
-                               scales::percent(n/sum(n), accuracy = 0.01), ")")),
-            hjust = - 0.1, size=3) +
-  expand_limits(y = c(0, 250)) +
-  labs(y = "Número de Contribuições", x = "LINGUAGEM")
-
-linguagem_plot
-
-ggsave ("linguagem_escuta2.png", height = 5, width = 7)
 
 # SUBTEMAS POR REGIAO
+
 setwd(here("Dados"))
-RD_Municipio <- read_xlsx("RD_Municipio.xlsx")
+RD_Municipio <- read_xlsx("RD_Municipio.xlsx") %>% mutate(municipio = ifelse(municipio == "Lagoa do Itaenga", "Lagoa de Itaenga", municipio))
 pernambuco <- st_read("PE_Municipios_2022.shp")
 
-linguagem <- rbind(
-  banco_escutas %>% select(CODE, `PRINCIPAL MUNICÍPIO DE ATUAÇÃO`) %>% rename(MUNICIPIO = 2),
-  banco_mapa %>% select(CODE, MUNICIPIO)
-) %>% mutate(MUNICIPIO = str_to_upper(MUNICIPIO)) %>% 
-  unique()
 
-banco_geral <- banco_geral %>% 
-  left_join(linguagem, by = "CODE")
+regiao <- mapa %>% 
+  mutate(municipio = ifelse(municipio == "São Caetano", "São Caitano", municipio)) %>% 
+  left_join(RD_Municipio) %>% 
+  group_by(municipio) %>% summarise(n = n())
 
-
-
-regiao <- banco_geral %>% 
-  group_by(MUNICIPIO) %>% summarise(n = n()) %>% 
-  mutate(MUNICIPIO = ifelse(MUNICIPIO == "LAGOA DO ITAENGA", "LAGOA DE ITAENGA",
-                            MUNICIPIO))
-
-pernambuco <- pernambuco %>% mutate(NM_MUN = toupper(NM_MUN)) %>% 
-  left_join(regiao, by = c("NM_MUN" = "MUNICIPIO")) %>% 
+pernambuco <- pernambuco %>% mutate(municipio = toupper(NM_MUN)) %>% 
+  left_join(regiao %>% mutate(municipio = toupper(municipio))) %>% 
   left_join(RD_Municipio %>% 
-              mutate(municipio = toupper(municipio)), by = c("NM_MUN" = "municipio"))
+              mutate(municipio = toupper(municipio)))
 
 pernambuco <- pernambuco %>% filter(CD_MUN != 2605459)
 
@@ -215,8 +173,7 @@ pernambuco <- pernambuco %>% left_join(macrorregiao)
 g5 <- ggplot() +
   geom_sf(data = pernambuco, aes(fill = n), color = "black") +
   labs(title = "",
-       fill = "Inscrições",
-       caption = "*Fernando de Noronha contribuiu com 3 manifestações.\nSertão 416 (37,24%)\nRMR 336 (30,08%)\n Zona da Mata 144 (12,89%)\nAgreste 113 (10,12%)\nNão Informado 108 (9,67%)") +
+       fill = "Inscrições") +
   theme_minimal() +
   theme(plot.caption = element_text(size = 9))
 plot(g5)
@@ -224,66 +181,71 @@ plot(g5)
 
 ggsave("mapa.png")
 
-banco_geral <- banco_geral %>% 
-  left_join(RD_Municipio %>% 
-              mutate(municipio = str_to_upper(municipio)), by = c("MUNICIPIO" = "municipio"))
+mapa <- mapa %>% mutate(municipio = ifelse(municipio == "São Caetano", "São Caitano", municipio)) %>% 
+  left_join(RD_Municipio)
 
-municipios <- banco_geral %>% 
-  group_by(MUNICIPIO) %>% summarise(n = n()) %>% 
-  mutate(prop = scales::percent(n/sum(n), accuracy = 0.01))
+mapa %>% count(municipio) %>% arrange(-n) %>% head(10)
 
-write.xlsx(municipios, "municipio data.xlsx")
-
-macrorregiao <- banco_geral %>% 
-  group_by(macrorreg_new) %>% summarise(n = n()) %>% 
-  mutate(prop = scales::percent(n/sum(n), accuracy = 0.01),
-         macrorreg_new = ifelse(is.na(macrorreg_new) == T, "Não Informado",
-                                macrorreg_new))
-
-
-
-
-regiao_subtema <- banco_geral %>% 
-  group_by(macrorreg_new, SUBTEMA, TEMA) %>% summarise(n = n()) %>% 
-  arrange(macrorreg_new, -n) %>% mutate(count = 1) %>% 
-  group_by(macrorreg_new) %>% mutate(rank = cumsum(count)) %>% 
-  filter(rank <= 5)
-
-
-write.xlsx(regiao_subtema, "regiao subtema.xlsx")
-
-tipo <- banco_geral %>% group_by(TEMA, TIPO) %>% 
-  summarise(n = n()) %>% group_by(TEMA) %>% mutate(prop = n/sum(n),
-                                                   TEMA = str_to_title(TEMA))
-
-tipo %>% group_by(TIPO) %>% summarise(n = sum(n))
-
-
-
-g <- ggplot(tipo, aes(x = TEMA, y = prop, fill = TIPO)) +
-  geom_bar(stat = "identity", position = "stack", color = "black") +
-  geom_text(aes(label = scales::percent(prop, accuracy = 0.01)), position = position_stack(vjust = .5), 
-            size = 4, fontface = "bold") +
-  coord_flip() +
-  theme(panel.grid = element_blank(),
-        legend.position = "top",
-        axis.text = element_text(size = 12)) +
-  scale_fill_manual(breaks = c("QUESTIONAMENTO", "PROPOSTA"),
-                    values = c("PROPOSTA" = "#D8BFD8",
-                               "QUESTIONAMENTO" = "darkorchid1")) +
-  labs(x = "Tema", y = "Proporção de Manifestação", fill = "Tipo") 
-g
-
-ggsave("propostas e questionamentos.png")
-
-# SUBTEMA POR LINGUAGEM
-
-ling_subtema <- banco_geral %>% 
-  group_by(LINGUAGEM, SUBTEMA) %>% summarise(n = n()) %>% 
-  mutate(prop = scales::percent(n/sum(n), accuracy = 0.01)) %>% 
-  arrange(LINGUAGEM, -n)
-
-
-write.xlsx(ling_subtema, "subtema por linguagem.xlsx")
-
-
+# banco_geral <- banco_geral %>% 
+#   left_join(RD_Municipio %>% 
+#               mutate(municipio = str_to_upper(municipio)), by = c("MUNICIPIO" = "municipio"))
+# 
+# municipios <- banco_geral %>% 
+#   group_by(MUNICIPIO) %>% summarise(n = n()) %>% 
+#   mutate(prop = scales::percent(n/sum(n), accuracy = 0.01))
+# 
+# write.xlsx(municipios, "municipio data.xlsx")
+# 
+# macrorregiao <- banco_geral %>% 
+#   group_by(macrorreg_new) %>% summarise(n = n()) %>% 
+#   mutate(prop = scales::percent(n/sum(n), accuracy = 0.01),
+#          macrorreg_new = ifelse(is.na(macrorreg_new) == T, "Não Informado",
+#                                 macrorreg_new))
+# 
+# 
+# 
+# 
+# regiao_subtema <- banco_geral %>% 
+#   group_by(macrorreg_new, SUBTEMA, TEMA) %>% summarise(n = n()) %>% 
+#   arrange(macrorreg_new, -n) %>% mutate(count = 1) %>% 
+#   group_by(macrorreg_new) %>% mutate(rank = cumsum(count)) %>% 
+#   filter(rank <= 5)
+# 
+# 
+# write.xlsx(regiao_subtema, "regiao subtema.xlsx")
+# 
+# tipo <- banco_geral %>% group_by(TEMA, TIPO) %>% 
+#   summarise(n = n()) %>% group_by(TEMA) %>% mutate(prop = n/sum(n),
+#                                                    TEMA = str_to_title(TEMA))
+# 
+# tipo %>% group_by(TIPO) %>% summarise(n = sum(n))
+# 
+# 
+# 
+# g <- ggplot(tipo, aes(x = TEMA, y = prop, fill = TIPO)) +
+#   geom_bar(stat = "identity", position = "stack", color = "black") +
+#   geom_text(aes(label = scales::percent(prop, accuracy = 0.01)), position = position_stack(vjust = .5), 
+#             size = 4, fontface = "bold") +
+#   coord_flip() +
+#   theme(panel.grid = element_blank(),
+#         legend.position = "top",
+#         axis.text = element_text(size = 12)) +
+#   scale_fill_manual(breaks = c("QUESTIONAMENTO", "PROPOSTA"),
+#                     values = c("PROPOSTA" = "#D8BFD8",
+#                                "QUESTIONAMENTO" = "darkorchid1")) +
+#   labs(x = "Tema", y = "Proporção de Manifestação", fill = "Tipo") 
+# g
+# 
+# ggsave("propostas e questionamentos.png")
+# 
+# # SUBTEMA POR LINGUAGEM
+# 
+# ling_subtema <- banco_geral %>% 
+#   group_by(LINGUAGEM, SUBTEMA) %>% summarise(n = n()) %>% 
+#   mutate(prop = scales::percent(n/sum(n), accuracy = 0.01)) %>% 
+#   arrange(LINGUAGEM, -n)
+# 
+# 
+# write.xlsx(ling_subtema, "subtema por linguagem.xlsx")
+# 
+# 

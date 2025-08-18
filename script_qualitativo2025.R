@@ -42,12 +42,31 @@ mapa %>% group_by(pnab_1) %>% summarise(n = n())
 write.xlsx(mapa %>% filter(pnab_1 == "Não") %>% select(id, pnab_1, pnab_1_n),
            "razões não participação pnab1.xlsx")
 
+razao <- read_xlsx("tratado_razões não participação pnab1.xlsx", sheet = "Sheet 1")
+
+
+a <- razao %>% group_by(categoria) %>% summarise(n = n())
+
+
+ggplot(a, aes(x = reorder(categoria, n), y = n)) +
+  geom_bar(stat = "identity", width = .6, fill = "#ffcf00") +
+  coord_flip() +
+  theme(panel.grid = element_blank()) +
+  labs(x = "Razões para não participação", y = "Inscrições") +
+  geom_text(aes(label = paste0(n, 
+                               " (",
+                               scales::percent(n/sum(n), accuracy = 0.01),
+                               ")")),
+            size = 3.5, hjust = -.1) +
+  expand_limits(y = c(0, 300))
+
+ggsave("razoes nao participar.png")
 
 # GERAL---------
 
 ## Temas
 
-temas<- escutas %>% count(tema)
+temas<- escutas %>% filter(tema != "Inválida") %>% count(tema)
 
 
 gtema <- ggplot(temas, aes (reorder (tema, n), n))+
@@ -137,6 +156,24 @@ gsubtema <- ggplot(subtema %>% filter(tema == "Editais"),
 gsubtema
 
 ggsave ("editais.png")
+
+
+# PRIORIDADES PNAB
+
+prioridade_fomento <- mapa %>% select(id, prioridade_fomento) %>% 
+  mutate(prioridade_fomento = gsub("\\.,", "\\.@", prioridade_fomento)) %>% 
+  cSplit('prioridade_fomento', sep = "@", direction = "long") %>% 
+  group_by(prioridade_fomento) %>% summarise(n = n()) %>% arrange(-n)
+
+write.xlsx(prioridade_fomento, "prioridades de fomento pnab.xlsx")
+
+
+prioridade_manutencao <- mapa %>% select(id, prioridade_manutencao) %>% 
+  mutate(prioridade_manutencao = gsub("\\.,", "\\.@", prioridade_manutencao)) %>% 
+  cSplit('prioridade_manutencao', sep = "@", direction = "long") %>% 
+  group_by(prioridade_manutencao) %>% summarise(n = n()) %>% arrange(-n)
+
+write.xlsx(prioridade_manutencao, "prioridades de aquisicao pnab.xlsx")
 
 # CONTRIBUICOES POR LINGUAGENS
 
